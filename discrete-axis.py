@@ -5,31 +5,50 @@ from gremlin.util import log
 
 from time import sleep
 
+import sys
+import os
 
+# Patch path to allow us to import a module installed next to this file.
+try:
+    import pollmanager
+except ImportError:
+    sys.path.append(os.path.dirname(__file__))
+    import pollmanager
+    
+    
+# Spitfire -- Water: 6
+# He 111   -- Oil  : 5
+# bf 110   -- Water: 9
+# bf 110   -- Oil  : 5
 N = IntegerVariable(
     'N',
     'Number of discrete values to partition the axis into',
     initial_value=6,
-    min_value=1)
-overlap = FloatVariable(
-    'o2',
-    'Scale regions by this factor, to allow some hysteresis.',
-    initial_value=1.1,
     min_value=1,
-    max_value=1.8,
+    max_value=100,)
+
+# Allow some amount of hysteresis so that a noisy axis positioned right near a boundary point doesn't jitter back and forth. 
+overlap = IntegerVariable(
+    'overlap',
+    'Scale regions by this factor, to allow some hysteresis.',
+    initial_value=5,
+    min_value=0,
+    max_value=100,
 )
+
+# Il-2 seems to require this be > 0. I'm not sure what the limit is, but 50 seems to be a reasonable choice. 
 delay = IntegerVariable(
     'Delay',
     'Number of ms to hold button presses.',
     initial_value=50,
     min_value=0,
     max_value=100)
-poll_freq = IntegerVariable(
-    'Polling Frequency',
-    'Number of ms between polling. Recommended: twice delay.',
-    initial_value=100,
-    min_value=0,
-    max_value=200)
+# poll_freq = IntegerVariable(
+    # 'Polling Frequency',
+    # 'Number of ms between polling. Recommended: twice delay.',
+    # initial_value=100,
+    # min_value=0,
+    # max_value=200)
     
 p_axis=PhysicalInputVariable(
     'Axis',
@@ -47,6 +66,7 @@ v_down=VirtualInputVariable(
     [gremlin.common.InputType.JoystickButton]
 )
 
+# You'll want to use this to switch between different values of N for different planes. 
 mode = ModeVariable(
         "Mode",
         "The mode to use for this mapping"
@@ -58,6 +78,10 @@ reset_low = False
 already_reset = False
 
 def get_candidates(value):
+    """Find possible discrete values that could correspond to the given axis value.
+    
+    For some axis values, there are multiple steps this value could correspond to. This finds all such values. 
+    """
     # N settings means center-points are at
     # -1 + 2*i/(N-1)
     # It follows that dividing points are at
@@ -71,17 +95,17 @@ def get_candidates(value):
     # ((N-1)(v+1) - alpha) / 2 < i
     _N = N.value
     v = value
-    alpha = overlap.value
+    alpha = 1 + overlap.value / 100
     i_low = math.floor(((_N-1)*(v + 1) + alpha) / 2)
     i_high = math.ceil(((_N-1)*(v + 1) - alpha) / 2)
     x_low = -1 + (2 * i_low - alpha) / (_N - 1)
     x_high = -1 + (2 * i_high + alpha) / (_N - 1)
-    log(f"high: {i_high}, low : {i_low }")
-    log(f"x_high: {x_high}, x_low: {x_low}")
+    # log(f"high: {i_high}, low : {i_low }")
+    # log(f"x_high: {x_high}, x_low: {x_low}")
     return set((i_low , i_high))
     
 axis_decorator = p_axis.create_decorator(mode.value)
-log("Init")
+# log("Init")
 
 
 @axis_decorator.axis(p_axis.input_id)
@@ -96,30 +120,36 @@ def axis_change(event, vjoy):
     else:
         already_reset = False
 
-@gremlin.input_devices.periodic(poll_freq.value / 1000)
+# Due to https://github.com/WhiteMagic/JoystickGremlin/issues/309
+# we can't have multiple instances using the periodic decorator. As a hacky workaround, 
+# the manager plugin registers a single periodic callback, 
+# which executes all of the callbacks registered by instances of this plugin. 
+
+#@gremlin.input_devices.periodic(poll_freq.value / 1000)
+@pollmanager.register_vjoy_callback
 def poll(vjoy):
-    global step, reset_low, fresh, value
-    log("polling")
+    global step, reset_low, value
+    # log("polling")
     # Make sure that even if things get out of sync, moving the axis
     # to the low stop resets it to the lowest setting.
     if reset_low:
-        log("resetting")
+        # log("resetting")
         down(vjoy)
         if step <= 0:
             reset_low = False
-            log("done resetting")
+            # log("done resetting")
         return
 
     candidates = get_candidates(value)
     if step in candidates:
-        log("Nothing to do")
+        # log("Nothing to do")
         return
 
     if step < min(candidates):
-        log("up")
+        # log("up")
         up(vjoy)
     elif step > max(candidates):
-        log("down")
+        # log("down")
         down(vjoy)
     else:
         log("Go fix your get_candidates function!")
