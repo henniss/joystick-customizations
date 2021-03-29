@@ -1,8 +1,11 @@
 import sys
+import os
+
+# Patch path to allow us to import a module installed next to this file.
 try:
     import pollmanager
 except ImportError:
-    sys.path.append(r"C:\Users\Harris Enniss\Desktop\joystick-customizations")
+    sys.path.append(os.path.dirname(__file__))
     import pollmanager
 
 

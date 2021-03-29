@@ -6,25 +6,37 @@ from gremlin.util import log
 from time import sleep
 
 import sys
+import os
 
+# Patch path to allow us to import a module installed next to this file.
 try:
     import pollmanager
 except ImportError:
-    sys.path.append(r"C:\Users\Harris Enniss\Desktop\joystick-customizations")
+    sys.path.append(os.path.dirname(__file__))
     import pollmanager
     
+    
+# Spitfire -- Water: 6
+# He 111   -- Oil  : 5
+# bf 110   -- Water: 9
+# bf 110   -- Oil  : 5
 N = IntegerVariable(
     'N',
     'Number of discrete values to partition the axis into',
     initial_value=6,
-    min_value=1)
-overlap = FloatVariable(
+    min_value=1,
+    max_value=100,)
+
+# Allow some amount of hysteresis so that a noisy axis positioned right near a boundary point doesn't jitter back and forth. 
+overlap = IntegerVariable(
     'overlap',
     'Scale regions by this factor, to allow some hysteresis.',
-    initial_value=1.1,
-    min_value=1,
-    max_value=1.8,
+    initial_value=5,
+    min_value=0,
+    max_value=100,
 )
+
+# Il-2 seems to require this be > 0. I'm not sure what the limit is, but 50 seems to be a reasonable choice. 
 delay = IntegerVariable(
     'Delay',
     'Number of ms to hold button presses.',
@@ -54,6 +66,7 @@ v_down=VirtualInputVariable(
     [gremlin.common.InputType.JoystickButton]
 )
 
+# You'll want to use this to switch between different values of N for different planes. 
 mode = ModeVariable(
         "Mode",
         "The mode to use for this mapping"
@@ -65,6 +78,10 @@ reset_low = False
 already_reset = False
 
 def get_candidates(value):
+    """Find possible discrete values that could correspond to the given axis value.
+    
+    For some axis values, there are multiple steps this value could correspond to. This finds all such values. 
+    """
     # N settings means center-points are at
     # -1 + 2*i/(N-1)
     # It follows that dividing points are at
@@ -78,7 +95,7 @@ def get_candidates(value):
     # ((N-1)(v+1) - alpha) / 2 < i
     _N = N.value
     v = value
-    alpha = overlap.value
+    alpha = 1 + overlap.value / 100
     i_low = math.floor(((_N-1)*(v + 1) + alpha) / 2)
     i_high = math.ceil(((_N-1)*(v + 1) - alpha) / 2)
     x_low = -1 + (2 * i_low - alpha) / (_N - 1)
@@ -103,10 +120,15 @@ def axis_change(event, vjoy):
     else:
         already_reset = False
 
+# Due to https://github.com/WhiteMagic/JoystickGremlin/issues/309
+# we can't have multiple instances using the periodic decorator. As a hacky workaround, 
+# the manager plugin registers a single periodic callback, 
+# which executes all of the callbacks registered by instances of this plugin. 
+
 #@gremlin.input_devices.periodic(poll_freq.value / 1000)
 @pollmanager.register_vjoy_callback
 def poll(vjoy):
-    global step, reset_low, fresh, value
+    global step, reset_low, value
     # log("polling")
     # Make sure that even if things get out of sync, moving the axis
     # to the low stop resets it to the lowest setting.
