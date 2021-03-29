@@ -83,12 +83,12 @@ def get_candidates(value):
     i_high = math.ceil(((_N-1)*(v + 1) - alpha) / 2)
     x_low = -1 + (2 * i_low - alpha) / (_N - 1)
     x_high = -1 + (2 * i_high + alpha) / (_N - 1)
-    log(f"high: {i_high}, low : {i_low }")
-    log(f"x_high: {x_high}, x_low: {x_low}")
+    # log(f"high: {i_high}, low : {i_low }")
+    # log(f"x_high: {x_high}, x_low: {x_low}")
     return set((i_low , i_high))
     
 axis_decorator = p_axis.create_decorator(mode.value)
-log("Init")
+# log("Init")
 
 
 @axis_decorator.axis(p_axis.input_id)
@@ -107,27 +107,27 @@ def axis_change(event, vjoy):
 @pollmanager.register_vjoy_callback
 def poll(vjoy):
     global step, reset_low, fresh, value
-    log("polling")
+    # log("polling")
     # Make sure that even if things get out of sync, moving the axis
     # to the low stop resets it to the lowest setting.
     if reset_low:
-        log("resetting")
+        # log("resetting")
         down(vjoy)
         if step <= 0:
             reset_low = False
-            log("done resetting")
+            # log("done resetting")
         return
 
     candidates = get_candidates(value)
     if step in candidates:
-        log("Nothing to do")
+        # log("Nothing to do")
         return
 
     if step < min(candidates):
-        log("up")
+        # log("up")
         up(vjoy)
     elif step > max(candidates):
-        log("down")
+        # log("down")
         down(vjoy)
     else:
         log("Go fix your get_candidates function!")
