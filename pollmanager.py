@@ -29,6 +29,6 @@ def do_callbacks(vjoy):
         cb(vjoy)
 
 
-@register_vjoy_callback
+#@register_vjoy_callback
 def do_log(vjoy):
     log("Callbacks started")
