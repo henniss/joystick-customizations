@@ -40,6 +40,7 @@ appropriate keys (I use a five-position selector on my throttle).
 Now import the discrete-axis plugin, and click '+' to add three more instances
 of it. Set them up as follows:
 
+```
 mode        axis     buttons     N
 
 spit/111   water     1/2         6
@@ -49,6 +50,9 @@ spit/111   oil       3/4         5
 110        water     1/2         9
 
 110        oil       3/4         5
+
+```
+
 
 Save and activate your profile. Open up the input viewer and verify that these
 button presses can be seen as you move these axes. 
