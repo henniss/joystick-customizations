@@ -1,6 +1,6 @@
 # joystick-customizations
 
-My personal user plugins for JoystickGremlin.
+My personal user plugins for JoystickGremlin. This is not an officially supported Google product.
 
 ## Manager
 
