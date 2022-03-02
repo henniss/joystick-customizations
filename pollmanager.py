@@ -31,4 +31,4 @@ def do_callbacks(vjoy):
 
 #@register_vjoy_callback
 def do_log(vjoy):
-    log("Callbacks started")
+   pass
