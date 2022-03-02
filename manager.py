@@ -41,5 +41,4 @@ poll_freq = IntegerVariable(
     
 @gremlin.input_devices.periodic(poll_freq.value / 1000)
 def poll(vjoy):
-    log("Doing poll")
     pollmanager.do_callbacks(vjoy)
