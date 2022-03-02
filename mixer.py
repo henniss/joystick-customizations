@@ -35,12 +35,13 @@
 
 # JG doesn't seem to have provision for a virtualenv on its own, so
 # activate one (for pygame)
-venv_py = "./venv/bin/activate_this.py"
-exec(open(venv_py).read(), {'__file__': venv_py}).
+import os
+import sys
 
 import enum
 import collections
 import functools
+
 
 import pygame
 import pygame.midi as pm
@@ -49,8 +50,6 @@ import gremlin
 from gremlin.user_plugin import *
 from gremlin.util import log
 
-import sys
-import os
 # Patch path to allow us to import a module installed next to this file.
 try:
     import pollmanager
@@ -155,7 +154,7 @@ for base, mode in zip([32, 48, 64], [MixerMode.BLENDED, MixerMode.MIN,
 AXIS_MAP=dict(AXIS_MAP)
 BUTTON_MAP=dict(BUTTON_MAP)
 
-MAX_EVENTS=100
+MAX_EVENTS=1
 def process_events(device, vjoy):
     if device.poll():
         for event, _ in device.read(MAX_EVENTS):
@@ -173,16 +172,30 @@ def process_events(device, vjoy):
         for i in range(0, 4):
             for system in SYSTEMS:
                 MIXERS[system][i+1].send_output(vjoy)
-
-pygame.midi.init()
+    else:
+        log("no events seen")
+pm.quit()
+pm.init()
+def midi_test():
+    dev = pm.Input(1)
+    while not dev.poll():
+        time.sleep(0.1)
+        
+    for event in dev.read(20):
+        log(event)
+    dev.close()
+        
+#midi_test()
 
 def get_device_id(name, kind='input'):
     if kind not in ('input', 'output'):
         raise ValueError("Unrecognized kind %s." % kind)
     N=pm.get_count()
+    log("count: %d" % N)
     print(N)
     for i in range(N):
         _, dev_name, input, output, _ = pm.get_device_info(i)
+        log(str(pm.get_device_info(i)))
         if kind == 'input' and input != 1:
             continue
         if kind == 'output' and output != 1:
@@ -190,44 +203,51 @@ def get_device_id(name, kind='input'):
         if name == dev_name:
             return i
     raise KeyError("Couldn't find device %s." % name)
+    
+DEVICE=None
+def init_device():
+    global DEVICE
+    if DEVICE is None:
+        DEVICE = pm.Input(get_device_id(b'nanoKONTROL2', 'input'))
+#init_device()
 
-DEVICE=pm.Input(get_device_id(b'nanoKONTROL2 MIDI 1', 'input'))
 @pollmanager.register_vjoy_callback
 def do_poll(vjoy):
+    log('poll')
     process_events(DEVICE, vjoy)
 
-cm3 = gremlin.input_devices.JoystickDecorator("Virpil CM3", "TODO", "quad")
-twcs = gremlin.input_devices.JoystickDecorator("TWCS", "TODO", "quad")
-trim = gremlin.input_devices.JoystickDecorator("Trim Box", "TODO", "quad")
+cm3 = gremlin.input_devices.JoystickDecorator("Virpil CM3", "{4AAC9630-7855-11EB-8003-444553540000}", "Quad")
+twcs = gremlin.input_devices.JoystickDecorator("TWCS", "{D3396E30-9DB1-11EA-8001-444553540000}", "Quad")
+trim = gremlin.input_devices.JoystickDecorator("Trim Box", "{DF7E52F0-E185-11EB-8001-444553540000}", "Quad")
 
-@cm3.axis(3)
+@cm3.axis(4)
 def lthrottle(event, vjoy):
     mixers = [MIXERS['throttle'][i] for i in [1, 2]]
     joystick_event(event.value, mixers, vjoy)
 
-@cm3.axis(4)
+@cm3.axis(5)
 def rthrottle(event, vjoy):
     mixers = [MIXERS['throttle'][i] for i in [3,4]]
     joystick_event(event.value, mixers, vjoy)
 
-@cm3.axis(5)
+@cm3.axis(6)
 def rpm(event, vjoy):
     mixers = [MIXERS['rpm'][i] for i in [1, 2,3,4]]
     joystick_event(event.value, mixers, vjoy)
 
-@trim.axis(4)
-def rpm(event, vjoy):
+@trim.axis(3)
+def mixture(event, vjoy):
     mixers = [MIXERS['mixture'][i] for i in [1, 2,3,4]]
     joystick_event(event.value, mixers, vjoy)
 
 @twcs.axis(3)
-def rpm(event, vjoy):
+def radiator(event, vjoy):
     mixers = [MIXERS['radiator'][i] for i in [1, 2,3,4]]
     joystick_event(event.value, mixers, vjoy)
 
 def joystick_event(val, mixers, vjoy):
     """Generic handler for all the normal joystick event handlers"""
     for m in mixers:
-        m.set_primary(
+        m.set_primary(val)
     for m in mixers:
         m.send_output(vjoy)
