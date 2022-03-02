@@ -17,7 +17,8 @@ import math
 from gremlin.user_plugin import *
 from gremlin.util import log
 
-from datetime import now
+from datetime import datetime
+from time import sleep
 
 # This is intended to model normally-automatic controls that can be
 # overridden in an emergency. Think of a four-way ON-OFF-(ON)-(ON)
@@ -39,42 +40,42 @@ DELAY=50
 
 # Time after which holding the override key causes a second
 # toggle. Useful if our state gets out of sync with the game.
-HOLD_SECONDs=2
+HOLD_SECONDS=2
 
 # Todo: I should create a RESET mixin that lets all instances be reset
 # at once.
 
 OVERRIDE=False
-Clock=None
+CLOCK=None
 
 key_up = PhysicalInputVariable(
-   'Up',
+   'PUp',
    'Up',
    [gremlin.common.InputType.JoystickButton],
 )
 key_down = PhysicalInputVariable(
-   'Down',
+   'PDown',
    'Down',
    [gremlin.common.InputType.JoystickButton],
 )
 key_override = PhysicalInputVariable(
-   'Override',
+   'POverride',
    'Override',
    [gremlin.common.InputType.JoystickButton],
    )
 
 v_up = VirtualInputVariable(
-   'Up',
+   'VUp',
    'Up',
    [gremlin.common.InputType.JoystickButton],
 )
 v_down = VirtualInputVariable(
-   'Down',
+   'VDown',
    'Down',
    [gremlin.common.InputType.JoystickButton],
 )
 v_override = VirtualInputVariable(
-   'Override',
+   'VOverride',
    'Override',
    [gremlin.common.InputType.JoystickButton],
    )
@@ -88,13 +89,16 @@ down_decorator = key_down.create_decorator(mode.value)
 override_decorator = key_override.create_decorator(mode.value)
 
 def short_press(button):
+    log('press short')
     button.is_pressed=True
     sleep(DELAY / 1000)
     button.is_pressed=False
 
 def toggle_override(vjoy):
+   log('toggle')
    global OVERRIDE
-   OVERRIDE=True
+   OVERRIDE=not OVERRIDE
+   log(str(OVERRIDE))
    device = vjoy[v_override.value['device_id']]
    button = device.button(v_override.value['input_id'])
    short_press(button)
@@ -102,14 +106,21 @@ def toggle_override(vjoy):
 @up_decorator.button(key_up.input_id)
 def up(event, vjoy):
    global OVERRIDE
-   device = vjoy[v_up.value['device_id']]
-   button = device.button(v_up.value['input_id'])
-   if event.is_pressed:
-      if not OVERRIDE:
-          toggle_override(vjoy)
-      button.is_pressed=True
-   else:
-      button.is_pressed=False
+   log('up')
+   try:
+       device = vjoy[v_up.value['device_id']]
+       button = device.button(v_up.value['input_id'])
+       if event.is_pressed:
+          log('pressed')
+          if not OVERRIDE:
+              log('toggle')
+              toggle_override(vjoy)
+          button.is_pressed=True
+       else:
+          log('not pressed')
+          button.is_pressed=False
+   except exception as e:
+       print(e)
 
 @down_decorator.button(key_down.input_id)
 def down(event, vjoy):
@@ -124,12 +135,12 @@ def down(event, vjoy):
       button.is_pressed=False
 
 @override_decorator.button(key_override.input_id)
-def down(event, vjoy):
+def override(event, vjoy):
    global OVERRIDE, CLOCK
    if event.is_pressed:
       CLOCK=datetime.now()
       if OVERRIDE:
           toggle_override(vjoy)
-   elif CLOCK is not None and (CLOCK-time.now()).seconds > HOLD_SECONDS:
+   elif CLOCK is not None and (datetime.now() - CLOCK).seconds > HOLD_SECONDS:
       toggle_override(vjoy)
 
